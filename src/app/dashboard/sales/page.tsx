@@ -121,7 +121,7 @@ export default function SalesAnalysisPage() {
                             />
                             <Tooltip
                                 contentStyle={{ backgroundColor: '#0F2A1E', border: '1px solid #1A4D35', color: '#fff' }}
-                                formatter={(value: number) => [`Rp ${(value / 1000000).toFixed(2)}M`, 'Sales']}
+                                formatter={(value: any) => [`Rp ${(Number(value) / 1000000).toFixed(2)}M`, 'Sales']}
                                 labelFormatter={(label) => `Day ${label}`}
                             />
                             <Line
