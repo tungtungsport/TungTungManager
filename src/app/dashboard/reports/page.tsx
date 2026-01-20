@@ -46,13 +46,14 @@ export default function ReportsPage() {
                     .from('orders')
                     .select('total')
                     .gte('created_at', startOfMonth)
-                    .eq('status', 'COMPLETED');
+                    .eq('status', 'SELESAI');
                 const monthlyRevenue = monthlyOrders?.reduce((sum, o) => sum + o.total, 0) || 0;
 
-                // Total orders
+                // Total orders (SELESAI)
                 const { count: totalOrders } = await supabase
                     .from('orders')
-                    .select('*', { count: 'exact', head: true });
+                    .select('*', { count: 'exact', head: true })
+                    .eq('status', 'SELESAI');
 
                 // Active products
                 const { count: activeProducts } = await supabase
@@ -72,10 +73,16 @@ export default function ReportsPage() {
                     totalFavorites: totalFavorites || 0
                 });
 
-                // Top products
+                // Top products (filtered by SELESAI status)
                 const { data: orderItems } = await supabase
                     .from('order_items')
-                    .select('product_name, quantity, total_price');
+                    .select(`
+                        product_name, 
+                        quantity, 
+                        total_price,
+                        orders!inner(status)
+                    `)
+                    .eq('orders.status', 'SELESAI');
 
                 const salesMap: Record<string, { sales: number; revenue: number }> = {};
                 (orderItems || []).forEach((item: any) => {

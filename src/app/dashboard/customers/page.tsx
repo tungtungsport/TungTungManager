@@ -28,10 +28,15 @@ export default function CustomersPage() {
                 .order('favorite_count', { ascending: false })
                 .limit(10);
 
-            // Get purchase counts for each product from order_items
+            // Get purchase counts for each product from order_items (filtered by SELESAI status)
             const { data: orderItems } = await supabase
                 .from('order_items')
-                .select('product_id, quantity');
+                .select(`
+                    product_id, 
+                    quantity,
+                    orders!inner(status)
+                `)
+                .eq('orders.status', 'SELESAI');
 
             const purchaseMap: Record<string, number> = {};
             (orderItems || []).forEach((item: any) => {

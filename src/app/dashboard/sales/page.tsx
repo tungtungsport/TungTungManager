@@ -28,7 +28,8 @@ export default function SalesAnalysisPage() {
                 const { data: ordersData, error } = await supabase
                     .from('orders')
                     .select('total, created_at')
-                    .gte('created_at', thirtyDaysAgo.toISOString());
+                    .gte('created_at', thirtyDaysAgo.toISOString())
+                    .eq('status', 'SELESAI');
 
                 if (error) {
                     console.error('Error fetching orders:', error);
