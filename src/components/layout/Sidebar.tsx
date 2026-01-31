@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 
 const navItems = [
-    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Sales Analysis", href: "/dashboard/sales", icon: TrendingUp },
-    { name: "Inventory", href: "/dashboard/inventory", icon: Package },
-    { name: "Customers", href: "/dashboard/customers", icon: Users },
-    { name: "Reports", href: "/dashboard/reports", icon: FileText },
+    { name: "Ringkasan", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Analisis Penjualan", href: "/dashboard/sales", icon: TrendingUp },
+    { name: "Inventaris", href: "/dashboard/inventory", icon: Package },
+    { name: "Pelanggan", href: "/dashboard/customers", icon: Users },
+    { name: "Laporan", href: "/dashboard/reports", icon: FileText },
 ];
 
 interface SidebarProps {
@@ -88,7 +88,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                     {collapsed ? <ChevronRight className="h-5 w-5" /> : (
                         <>
                             <ChevronLeft className="h-5 w-5" />
-                            <span className="font-heading text-xs uppercase tracking-wider">Collapse</span>
+                            <span className="font-heading text-xs uppercase tracking-wider">Tutup</span>
                         </>
                     )}
                 </button>

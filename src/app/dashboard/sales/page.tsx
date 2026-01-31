@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { TrendingUp, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { DateFilter, useDateFilter } from "@/components/DateFilter";
 
 interface DailySale {
     day: number;
@@ -16,20 +17,37 @@ export default function SalesAnalysisPage() {
     const [totalOrders, setTotalOrders] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Date filter
+    const {
+        filterPeriod, setFilterPeriod,
+        selectedMonth, setSelectedMonth,
+        selectedYear, setSelectedYear,
+        selectedDate, setSelectedDate,
+        getDateRange
+    } = useDateFilter('daily');
+
     useEffect(() => {
         async function fetchSalesData() {
             try {
                 setIsLoading(true);
+                const { startDate, endDate } = getDateRange;
 
-                // Fetch all orders from last 30 days
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-                const { data: ordersData, error } = await supabase
+                // Fetch all orders from filtered date range
+                let query = supabase
                     .from('orders')
                     .select('total, created_at')
-                    .gte('created_at', thirtyDaysAgo.toISOString())
                     .eq('status', 'SELESAI');
+
+                if (startDate && endDate) {
+                    query = query.gte('created_at', startDate).lte('created_at', endDate);
+                } else {
+                    // Default to last 30 days if no filter
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                    query = query.gte('created_at', thirtyDaysAgo.toISOString());
+                }
+
+                const { data: ordersData, error } = await query;
 
                 if (error) {
                     console.error('Error fetching orders:', error);
@@ -68,7 +86,7 @@ export default function SalesAnalysisPage() {
         }
 
         fetchSalesData();
-    }, []);
+    }, [getDateRange]);
 
     if (isLoading) {
         return (
@@ -83,23 +101,35 @@ export default function SalesAnalysisPage() {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div>
-                <h1 className="font-heading text-2xl text-white uppercase tracking-wide">Sales Analysis</h1>
-                <p className="text-[#C7D4CE] text-sm mt-1">Detailed revenue and sales behavior insights</p>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                    <h1 className="font-heading text-2xl text-white uppercase tracking-wide">Analisis Penjualan</h1>
+                    <p className="text-[#C7D4CE] text-sm mt-1">Wawasan detail pendapatan dan perilaku penjualan</p>
+                </div>
+                <DateFilter
+                    filterPeriod={filterPeriod}
+                    setFilterPeriod={setFilterPeriod}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    selectedYear={selectedYear}
+                    setSelectedYear={setSelectedYear}
+                    selectedDate={selectedDate}
+                    setSelectedDate={setSelectedDate}
+                />
             </div>
 
             {/* Summary Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-5">
-                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">30-Day Total Revenue</p>
+                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Total Pendapatan</p>
                     <p className="font-numeric text-2xl text-[#7CFF9B] font-bold">Rp {(totalRevenue / 1000000).toFixed(1)}M</p>
                 </div>
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-5">
-                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Avg Daily Sales</p>
+                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Rata-rata Harian</p>
                     <p className="font-numeric text-2xl text-white font-bold">Rp {(avgDailySales / 1000000).toFixed(2)}M</p>
                 </div>
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-5">
-                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Total Orders</p>
+                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Total Pesanan</p>
                     <p className="font-numeric text-2xl text-[#1ED760] font-bold">{totalOrders}</p>
                 </div>
             </div>
@@ -108,7 +138,7 @@ export default function SalesAnalysisPage() {
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
                 <div className="flex items-center gap-2 mb-6">
                     <TrendingUp className="h-5 w-5 text-[#7CFF9B]" />
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider">Daily Sales (Last 30 Days)</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider">Penjualan Harian (30 Hari Terakhir)</h3>
                 </div>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -122,7 +152,7 @@ export default function SalesAnalysisPage() {
                             />
                             <Tooltip
                                 contentStyle={{ backgroundColor: '#0F2A1E', border: '1px solid #1A4D35', color: '#fff' }}
-                                formatter={(value: any) => [`Rp ${(Number(value) / 1000000).toFixed(2)}M`, 'Sales']}
+                                formatter={(value: any) => [`Rp ${(Number(value) / 1000000).toFixed(2)}M`, 'Penjualan']}
                                 labelFormatter={(label) => `Day ${label}`}
                             />
                             <Line

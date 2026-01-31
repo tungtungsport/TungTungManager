@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Heart, ShoppingBag, TrendingUp, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { useState, useEffect } from "react";
+import { DateFilter, useDateFilter } from "@/components/DateFilter";
 
 interface FavoritedProduct {
     id: string;
@@ -16,6 +17,15 @@ interface FavoritedProduct {
 export default function CustomersPage() {
     const [products, setProducts] = useState<FavoritedProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    // Date filter
+    const {
+        filterPeriod, setFilterPeriod,
+        selectedMonth, setSelectedMonth,
+        selectedYear, setSelectedYear,
+        selectedDate, setSelectedDate,
+        getDateRange
+    } = useDateFilter('all');
 
     useEffect(() => {
         async function fetchCustomerData() {
@@ -56,7 +66,7 @@ export default function CustomersPage() {
         }
 
         fetchCustomerData();
-    }, []);
+    }, [getDateRange]);
 
     if (isLoading) {
         return (
@@ -73,9 +83,21 @@ export default function CustomersPage() {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div>
-                <h1 className="font-heading text-2xl text-white uppercase tracking-wide">Customer Behavior</h1>
-                <p className="text-[#C7D4CE] text-sm mt-1">Wishlist and purchase pattern analysis</p>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                    <h1 className="font-heading text-2xl text-white uppercase tracking-wide">Perilaku Pelanggan</h1>
+                    <p className="text-[#C7D4CE] text-sm mt-1">Analisis pola wishlist dan pembelian</p>
+                </div>
+                <DateFilter
+                    filterPeriod={filterPeriod}
+                    setFilterPeriod={setFilterPeriod}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    selectedYear={selectedYear}
+                    setSelectedYear={setSelectedYear}
+                    selectedDate={selectedDate}
+                    setSelectedDate={setSelectedDate}
+                />
             </div>
 
             {/* Summary Stats */}
@@ -85,7 +107,7 @@ export default function CustomersPage() {
                         <div className="p-2 bg-[#0A1A13] text-[#D64545]">
                             <Heart className="h-5 w-5 fill-current" />
                         </div>
-                        <p className="text-[#C7D4CE] text-xs uppercase tracking-wider">Total Favorites</p>
+                        <p className="text-[#C7D4CE] text-xs uppercase tracking-wider">Total Favorit</p>
                     </div>
                     <p className="font-numeric text-3xl text-white font-bold">{totalFavorites}</p>
                 </div>
@@ -94,7 +116,7 @@ export default function CustomersPage() {
                         <div className="p-2 bg-[#0A1A13] text-[#7CFF9B]">
                             <ShoppingBag className="h-5 w-5" />
                         </div>
-                        <p className="text-[#C7D4CE] text-xs uppercase tracking-wider">Converted Purchases</p>
+                        <p className="text-[#C7D4CE] text-xs uppercase tracking-wider">Pembelian Terkonversi</p>
                     </div>
                     <p className="font-numeric text-3xl text-[#7CFF9B] font-bold">{totalPurchases}</p>
                 </div>
@@ -103,7 +125,7 @@ export default function CustomersPage() {
                         <div className="p-2 bg-[#0A1A13] text-[#1ED760]">
                             <TrendingUp className="h-5 w-5" />
                         </div>
-                        <p className="text-[#C7D4CE] text-xs uppercase tracking-wider">Conversion Rate</p>
+                        <p className="text-[#C7D4CE] text-xs uppercase tracking-wider">Tingkat Konversi</p>
                     </div>
                     <p className="font-numeric text-3xl text-[#1ED760] font-bold">{conversionRate}%</p>
                 </div>
@@ -111,10 +133,10 @@ export default function CustomersPage() {
 
             {/* Favorites vs Purchases Chart */}
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Wishlist vs Actual Purchases</h3>
+                <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Wishlist vs Pembelian Aktual</h3>
                 <div className="h-80">
                     {products.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-[#C7D4CE]">No data yet</div>
+                        <div className="flex items-center justify-center h-full text-[#C7D4CE]">Belum ada data</div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={products.slice(0, 6)} layout="vertical">
@@ -142,23 +164,23 @@ export default function CustomersPage() {
 
             {/* Products Table */}
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Most Favorited Products</h3>
+                <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Produk Paling Difavoritkan</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-[#1A4D35]">
                                 <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">#</th>
-                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Product</th>
-                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Brand</th>
-                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Favorites</th>
-                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Purchases</th>
-                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Conversion</th>
+                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Produk</th>
+                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Merek</th>
+                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Favorit</th>
+                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Pembelian</th>
+                                <th className="text-left py-4 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Konversi</th>
                             </tr>
                         </thead>
                         <tbody>
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="py-8 text-center text-[#C7D4CE]">No data yet</td>
+                                    <td colSpan={6} className="py-8 text-center text-[#C7D4CE]">Belum ada data</td>
                                 </tr>
                             ) : (
                                 products.map((product, i) => {
@@ -190,9 +212,9 @@ export default function CustomersPage() {
                 <div className="flex items-start gap-3">
                     <TrendingUp className="h-5 w-5 text-[#1ED760] flex-shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-[#1ED760] font-bold text-sm uppercase mb-1">Customer Insight</p>
+                        <p className="text-[#1ED760] font-bold text-sm uppercase mb-1">Wawasan Pelanggan</p>
                         <p className="text-[#C7D4CE] text-sm">
-                            Favorites indicate customer interest but not guaranteed sales. Products with high favorites but low conversion may need promotional attention.
+                            Favorit menunjukkan minat pelanggan tetapi bukan penjualan yang dijamin. Produk dengan favorit tinggi tetapi konversi rendah mungkin memerlukan perhatian promosi.
                         </p>
                     </div>
                 </div>

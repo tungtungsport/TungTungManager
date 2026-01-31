@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase";
 import { FileText, Download, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { DateFilter, useDateFilter } from "@/components/DateFilter";
 
 interface ReportStats {
     monthlyRevenue: number;
@@ -34,19 +35,37 @@ export default function ReportsPage() {
     const [categories, setCategories] = useState<CategoryData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Date filter
+    const {
+        filterPeriod, setFilterPeriod,
+        selectedMonth, setSelectedMonth,
+        selectedYear, setSelectedYear,
+        selectedDate, setSelectedDate,
+        getDateRange
+    } = useDateFilter('monthly');
+
     useEffect(() => {
         async function fetchReportData() {
             try {
                 setIsLoading(true);
 
-                // Monthly revenue
-                const now = new Date();
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-                const { data: monthlyOrders } = await supabase
+                // Monthly revenue - use filtered period
+                const { startDate, endDate } = getDateRange;
+                let revenueQuery = supabase
                     .from('orders')
                     .select('total')
-                    .gte('created_at', startOfMonth)
                     .eq('status', 'SELESAI');
+
+                if (startDate && endDate) {
+                    revenueQuery = revenueQuery.gte('created_at', startDate).lte('created_at', endDate);
+                } else {
+                    // Default to current month
+                    const now = new Date();
+                    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+                    revenueQuery = revenueQuery.gte('created_at', startOfMonth);
+                }
+
+                const { data: monthlyOrders } = await revenueQuery;
                 const monthlyRevenue = monthlyOrders?.reduce((sum, o) => sum + o.total, 0) || 0;
 
                 // Total orders (SELESAI)
@@ -129,7 +148,7 @@ export default function ReportsPage() {
         }
 
         fetchReportData();
-    }, []);
+    }, [getDateRange]);
 
     const handleExportCSV = () => {
         const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -185,22 +204,34 @@ export default function ReportsPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="font-heading text-2xl text-white uppercase tracking-wide print:text-black">Reports</h1>
-                    <p className="text-[#C7D4CE] text-sm mt-1 print:text-gray-600">Generate and export management reports</p>
+                    <h1 className="font-heading text-2xl text-white uppercase tracking-wide print:text-black">Laporan</h1>
+                    <p className="text-[#C7D4CE] text-sm mt-1 print:text-gray-600">Buat dan ekspor laporan manajemen</p>
                 </div>
-                <div className="flex items-center gap-3 print:hidden">
-                    <button
-                        onClick={handleExportPDF}
-                        className="flex items-center gap-2 bg-[#D64545] hover:bg-[#D64545]/80 text-white px-4 py-2 font-bold uppercase text-sm transition-colors"
-                    >
-                        <Download className="h-4 w-4" /> Export PDF
-                    </button>
-                    <button
-                        onClick={handleExportCSV}
-                        className="flex items-center gap-2 bg-[#1E7F43] hover:bg-[#1E7F43]/80 text-white px-4 py-2 font-bold uppercase text-sm transition-colors"
-                    >
-                        <Download className="h-4 w-4" /> Export CSV
-                    </button>
+                <div className="flex items-center gap-3">
+                    <DateFilter
+                        filterPeriod={filterPeriod}
+                        setFilterPeriod={setFilterPeriod}
+                        selectedMonth={selectedMonth}
+                        setSelectedMonth={setSelectedMonth}
+                        selectedYear={selectedYear}
+                        setSelectedYear={setSelectedYear}
+                        selectedDate={selectedDate}
+                        setSelectedDate={setSelectedDate}
+                    />
+                    <div className="flex gap-3 print:hidden">
+                        <button
+                            onClick={handleExportPDF}
+                            className="flex items-center gap-2 bg-[#D64545] hover:bg-[#D64545]/80 text-white px-4 py-2 font-bold uppercase text-sm transition-colors"
+                        >
+                            <Download className="h-4 w-4" /> Export PDF
+                        </button>
+                        <button
+                            onClick={handleExportCSV}
+                            className="flex items-center gap-2 bg-[#1E7F43] hover:bg-[#1E7F43]/80 text-white px-4 py-2 font-bold uppercase text-sm transition-colors"
+                        >
+                            <Download className="h-4 w-4" /> Export CSV
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -210,23 +241,23 @@ export default function ReportsPage() {
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6 print:bg-white print:border-gray-300">
                     <div className="flex items-center gap-2 mb-6">
                         <FileText className="h-5 w-5 text-[#7CFF9B] print:text-green-600" />
-                        <h3 className="font-heading text-white text-sm uppercase tracking-wider print:text-black">Monthly Summary - {currentMonth}</h3>
+                        <h3 className="font-heading text-white text-sm uppercase tracking-wider print:text-black">Ringkasan Bulanan - {currentMonth}</h3>
                     </div>
                     <div className="space-y-4">
                         <div className="flex justify-between items-center py-3 border-b border-[#1A4D35] print:border-gray-300">
-                            <span className="text-[#C7D4CE] print:text-gray-600">Total Revenue</span>
+                            <span className="text-[#C7D4CE] print:text-gray-600">Total Pendapatan</span>
                             <span className="font-numeric text-[#7CFF9B] font-bold print:text-green-600">Rp {stats.monthlyRevenue.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center py-3 border-b border-[#1A4D35] print:border-gray-300">
-                            <span className="text-[#C7D4CE] print:text-gray-600">Total Orders</span>
+                            <span className="text-[#C7D4CE] print:text-gray-600">Total Pesanan</span>
                             <span className="font-numeric text-white font-bold print:text-black">{stats.totalOrders.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center py-3 border-b border-[#1A4D35] print:border-gray-300">
-                            <span className="text-[#C7D4CE] print:text-gray-600">Active Products</span>
+                            <span className="text-[#C7D4CE] print:text-gray-600">Produk Aktif</span>
                             <span className="font-numeric text-white font-bold print:text-black">{stats.activeProducts}</span>
                         </div>
                         <div className="flex justify-between items-center py-3">
-                            <span className="text-[#C7D4CE] print:text-gray-600">Customer Favorites</span>
+                            <span className="text-[#C7D4CE] print:text-gray-600">Favorit Pelanggan</span>
                             <span className="font-numeric text-white font-bold print:text-black">{stats.totalFavorites}</span>
                         </div>
                     </div>
@@ -236,11 +267,11 @@ export default function ReportsPage() {
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6 print:bg-white print:border-gray-300">
                     <div className="flex items-center gap-2 mb-6">
                         <FileText className="h-5 w-5 text-[#7CFF9B] print:text-green-600" />
-                        <h3 className="font-heading text-white text-sm uppercase tracking-wider print:text-black">Category Breakdown</h3>
+                        <h3 className="font-heading text-white text-sm uppercase tracking-wider print:text-black">Rincian Kategori</h3>
                     </div>
                     <div className="space-y-4">
                         {categories.length === 0 ? (
-                            <p className="text-[#C7D4CE] text-center py-4">No data yet</p>
+                            <p className="text-[#C7D4CE] text-center py-4">Belum ada data</p>
                         ) : (
                             categories.map((cat, i) => (
                                 <div key={i} className="py-3 border-b border-[#1A4D35] last:border-0 print:border-gray-300">
@@ -265,22 +296,22 @@ export default function ReportsPage() {
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6 print:bg-white print:border-gray-300">
                 <div className="flex items-center gap-2 mb-6">
                     <FileText className="h-5 w-5 text-[#7CFF9B] print:text-green-600" />
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider print:text-black">Top Products Report</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider print:text-black">Laporan Produk Terlaris</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-[#1A4D35] print:border-gray-300">
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Rank</th>
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Product</th>
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Units Sold</th>
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Revenue</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4  CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Peringkat</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Produk</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Unit Terjual</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider print:text-gray-600">Pendapatan</th>
                             </tr>
                         </thead>
                         <tbody>
                             {topProducts.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="py-8 text-center text-[#C7D4CE]">No sales data yet</td>
+                                    <td colSpan={4} className="py-8 text-center text-[#C7D4CE]">Belum ada data penjualan</td>
                                 </tr>
                             ) : (
                                 topProducts.map((product, i) => (

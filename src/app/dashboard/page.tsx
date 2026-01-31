@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, ShoppingCart, Package, Heart, DollarSign, Loader2, Star } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { useState, useEffect } from "react";
+import { DateFilter, useDateFilter } from "@/components/DateFilter";
 
 interface KPIStats {
     monthlyRevenue: number;
@@ -71,18 +72,36 @@ export default function DashboardPage() {
     const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Date filter
+    const {
+        filterPeriod, setFilterPeriod,
+        selectedMonth, setSelectedMonth,
+        selectedYear, setSelectedYear,
+        selectedDate, setSelectedDate,
+        getDateRange
+    } = useDateFilter('monthly');
+
     useEffect(() => {
         async function fetchDashboardData() {
             setIsLoading(true);
 
-            // Get current month's revenue
-            const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-            const { data: monthlyOrders } = await supabase
+            // Get revenue for selected period
+            const { startDate, endDate } = getDateRange;
+            let revenueQuery = supabase
                 .from('orders')
                 .select('total')
-                .gte('created_at', startOfMonth)
                 .eq('status', 'SELESAI');
+
+            if (startDate && endDate) {
+                revenueQuery = revenueQuery.gte('created_at', startDate).lte('created_at', endDate);
+            } else {
+                // Default to current month
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+                revenueQuery = revenueQuery.gte('created_at', startOfMonth);
+            }
+
+            const { data: monthlyOrders } = await revenueQuery;
             const monthlyRevenue = monthlyOrders?.reduce((sum, o) => sum + o.total, 0) || 0;
 
             // Get total orders count
@@ -207,7 +226,7 @@ export default function DashboardPage() {
         }
 
         fetchDashboardData();
-    }, []);
+    }, [getDateRange]);
 
     if (isLoading) {
         return (
@@ -220,33 +239,45 @@ export default function DashboardPage() {
     return (
         <div className="space-y-8">
             {/* Page Header */}
-            <div>
-                <h1 className="font-heading text-2xl text-white uppercase tracking-wide">Overview Dashboard</h1>
-                <p className="text-[#C7D4CE] text-sm mt-1">Business performance snapshot</p>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                    <h1 className="font-heading text-2xl text-white uppercase tracking-wide">Dasbor Ringkasan</h1>
+                    <p className="text-[#C7D4CE] text-sm mt-1">Tampilan kinerja bisnis</p>
+                </div>
+                <DateFilter
+                    filterPeriod={filterPeriod}
+                    setFilterPeriod={setFilterPeriod}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    selectedYear={selectedYear}
+                    setSelectedYear={setSelectedYear}
+                    selectedDate={selectedDate}
+                    setSelectedDate={setSelectedDate}
+                />
             </div>
 
             {/* KPI Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <KPICard
-                    title="Monthly Revenue"
+                    title="Pendapatan Bulanan"
                     value={`Rp ${(stats.monthlyRevenue / 1000000).toFixed(1)}M`}
                     icon={DollarSign}
                     color="accent"
                 />
                 <KPICard
-                    title="Total Orders"
+                    title="Total Pesanan"
                     value={stats.totalOrders.toLocaleString()}
                     icon={ShoppingCart}
                     color="positive"
                 />
                 <KPICard
-                    title="Active Products"
+                    title="Produk Aktif"
                     value={stats.activeProducts.toString()}
                     icon={Package}
                     color="accent"
                 />
                 <KPICard
-                    title="Avg Product Rating"
+                    title="Rata-rata Rating Produk"
                     value={stats.avgRating.toFixed(1)}
                     icon={Star}
                     color="warning"
@@ -257,7 +288,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Monthly Sales Trend */}
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Monthly Sales Trend</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Tren Penjualan Bulanan</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={monthlyData}>
@@ -287,10 +318,10 @@ export default function DashboardPage() {
 
                 {/* Top Selling Products */}
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Top Selling Products</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Produk Terlaris</h3>
                     <div className="h-64">
                         {topProducts.length === 0 ? (
-                            <div className="flex items-center justify-center h-full text-[#C7D4CE]">No sales data yet</div>
+                            <div className="flex items-center justify-center h-full text-[#C7D4CE]">Belum ada data penjualan</div>
                         ) : (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={topProducts} layout="vertical">
@@ -306,7 +337,7 @@ export default function DashboardPage() {
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#0F2A1E', border: '1px solid #1A4D35', color: '#fff' }}
-                                        formatter={(value: number | undefined) => [value ?? 0, 'Sales']}
+                                        formatter={(value: number | undefined) => [value ?? 0, 'Penjualan']}
                                     />
                                     <Bar dataKey="sales" fill="#1E7F43" radius={[0, 4, 4, 0]} />
                                 </BarChart>
@@ -320,7 +351,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Rating Distribution */}
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Customer Satisfaction (Rating Dist.)</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Kepuasan Pelanggan (Distribusi Rating)</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={ratingDistribution}>
@@ -343,10 +374,10 @@ export default function DashboardPage() {
 
                 {/* Highly Rated Products */}
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Highly Rated Products</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Produk dengan Rating Tinggi</h3>
                     <div className="space-y-4">
                         {topRatedProducts.length === 0 ? (
-                            <div className="text-center py-8 text-[#C7D4CE]">No product ratings yet</div>
+                            <div className="text-center py-8 text-[#C7D4CE]">Belum ada rating produk</div>
                         ) : (
                             topRatedProducts.map((p, i) => (
                                 <div key={i} className="flex items-center justify-between p-3 bg-[#0A1A13] border border-[#1A4D35]/50 hover:border-accent/50 transition-colors">
@@ -360,7 +391,7 @@ export default function DashboardPage() {
                                         </div>
                                     </div>
                                     <div className="text-right flex-shrink-0">
-                                        <p className="text-accent text-[10px] font-bold uppercase">{p.sales > 0 ? `${p.sales} Sold` : 'New & Popular'}</p>
+                                        <p className="text-accent text-[10px] font-bold uppercase">{p.sales > 0 ? `${p.sales} Terjual` : 'Baru & Populer'}</p>
                                     </div>
                                 </div>
                             ))
@@ -371,20 +402,20 @@ export default function DashboardPage() {
 
             {/* Top Products Table */}
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Product Performance Summary</h3>
+                <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Ringkasan Performa Produk</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-[#1A4D35]">
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Product</th>
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Units Sold</th>
-                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Revenue</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Produk</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Unit Terjual</th>
+                                <th className="text-left py-3 px-4 text-[#C7D4CE] text-xs uppercase font-bold tracking-wider">Pendapatan</th>
                             </tr>
                         </thead>
                         <tbody>
                             {topProducts.length === 0 ? (
                                 <tr>
-                                    <td colSpan={3} className="py-8 text-center text-[#C7D4CE]">No sales data yet</td>
+                                    <td colSpan={3} className="py-8 text-center text-[#C7D4CE]">Belum ada data penjualan</td>
                                 </tr>
                             ) : (
                                 topProducts.map((product, i) => (

@@ -53,26 +53,26 @@ export default function LoginPage() {
                     <h1 className="font-heading text-4xl text-white tracking-tight mb-4">
                         TUNG TUNG <span className="text-[#7CFF9B]">SPORT</span>
                     </h1>
-                    <p className="text-[#C7D4CE] text-lg mb-12">Manager Analytics Dashboard</p>
+                    <p className="text-[#C7D4CE] text-lg mb-12">Dasbor Analitik Manajer</p>
 
                     <div className="bg-[#0F2A1E]/80 border border-[#1A4D35] p-6 text-left max-w-sm mx-auto">
-                        <h3 className="font-heading text-sm text-[#7CFF9B] mb-4">EXECUTIVE INSIGHTS</h3>
+                        <h3 className="font-heading text-sm text-[#7CFF9B] mb-4">WAWASAN EKSEKUTIF</h3>
                         <ul className="space-y-3 text-[#C7D4CE] text-sm">
                             <li className="flex items-center gap-2">
                                 <span className="w-2 h-2 bg-[#1ED760] rounded-full"></span>
-                                Revenue & Sales Trends
+                                Tren Pendapatan & Penjualan
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="w-2 h-2 bg-[#7CFF9B] rounded-full"></span>
-                                Inventory Health Monitoring
+                                Pemantauan Kesehatan Inventaris
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="w-2 h-2 bg-[#F2E94E] rounded-full"></span>
-                                Customer Behavior Analytics
+                                Analitik Perilaku Pelanggan
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="w-2 h-2 bg-[#C7D4CE] rounded-full"></span>
-                                Report Generation
+                                Pembuatan Laporan
                             </li>
                         </ul>
                     </div>
@@ -89,13 +89,13 @@ export default function LoginPage() {
                         <h1 className="font-heading text-xl text-white tracking-tight">
                             TUNG TUNG <span className="text-[#7CFF9B]">SPORT</span>
                         </h1>
-                        <p className="text-[#C7D4CE] text-sm mt-1">Manager Dashboard</p>
+                        <p className="text-[#C7D4CE] text-sm mt-1">Dasbor Manajer</p>
                     </div>
 
                     <div className="bg-[#0F2A1E] border border-[#1A4D35] p-8">
                         <div className="mb-8">
-                            <h2 className="font-heading text-2xl text-white uppercase tracking-wide">Manager Login</h2>
-                            <p className="text-[#C7D4CE] text-sm mt-2">Access your executive analytics dashboard</p>
+                            <h2 className="font-heading text-2xl text-white uppercase tracking-wide">Masuk Manajer</h2>
+                            <p className="text-[#C7D4CE] text-sm mt-2">Akses dasbor analitik eksekutif Anda</p>
                         </div>
 
                         {error && (
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
                             <div>
                                 <label className="block text-[#C7D4CE] text-xs font-bold uppercase tracking-wider mb-2">
-                                    Password
+                                    Kata Sandi
                                 </label>
                                 <div className="relative">
                                     <input
@@ -131,7 +131,7 @@ export default function LoginPage() {
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         className="w-full bg-[#0A1A13] border border-[#1A4D35] text-white px-4 py-3 pr-12 text-sm focus:outline-none focus:border-[#7CFF9B] transition-colors placeholder:text-[#C7D4CE]/40"
-                                        placeholder="Enter your password"
+                                        placeholder="Masukkan kata sandi Anda"
                                         required
                                         disabled={isLoading}
                                     />
@@ -153,12 +153,12 @@ export default function LoginPage() {
                                 {isLoading ? (
                                     <>
                                         <Loader2 className="h-5 w-5 animate-spin" />
-                                        <span>Signing in...</span>
+                                        <span>Memproses...</span>
                                     </>
                                 ) : (
                                     <>
                                         <LogIn className="h-5 w-5" />
-                                        <span>Access Dashboard</span>
+                                        <span>Akses Dasbor</span>
                                     </>
                                 )}
                             </button>
@@ -172,7 +172,7 @@ export default function LoginPage() {
                                 </a>
                             </p>
                             <p className="text-center text-[#C7D4CE] text-xs">
-                                Only users with <span className="text-[#7CFF9B] font-bold">manager</span> role can access this panel.
+                                Hanya pengguna dengan role <span className="text-[#7CFF9B] font-bold">manager</span> yang dapat mengakses panel ini.
                             </p>
                         </div>
                     </div>
