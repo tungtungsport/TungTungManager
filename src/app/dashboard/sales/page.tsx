@@ -38,13 +38,19 @@ export default function SalesAnalysisPage() {
                     .select('total, created_at')
                     .eq('status', 'SELESAI');
 
+                let effectiveStartDate: Date;
+                let effectiveEndDate: Date;
+
                 if (startDate && endDate) {
                     query = query.gte('created_at', startDate).lte('created_at', endDate);
+                    effectiveStartDate = new Date(startDate);
+                    effectiveEndDate = new Date(endDate);
                 } else {
                     // Default to last 30 days if no filter
-                    const thirtyDaysAgo = new Date();
-                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                    query = query.gte('created_at', thirtyDaysAgo.toISOString());
+                    effectiveEndDate = new Date();
+                    effectiveStartDate = new Date();
+                    effectiveStartDate.setDate(effectiveStartDate.getDate() - 30);
+                    query = query.gte('created_at', effectiveStartDate.toISOString());
                 }
 
                 const { data: ordersData, error } = await query;
@@ -55,24 +61,41 @@ export default function SalesAnalysisPage() {
                     return;
                 }
 
-                // Group by day
-                const salesByDay: Record<number, number> = {};
+                // Calculate number of days in the range
+                // For weekly: should be exactly 7 days (Sun-Sat)
+                // For monthly: special case - show 30 days back from end date
+                let numDays: number;
+
+                if (filterPeriod === 'monthly') {
+                    // For "Bulan Ini", show last 30 days from today
+                    numDays = 30;
+                    effectiveStartDate = new Date(effectiveEndDate);
+                    effectiveStartDate.setDate(effectiveEndDate.getDate() - 29); // 30 days including today
+                } else {
+                    // Calculate days between dates (inclusive of start, exclusive of end + 1 day)
+                    const daysDiff = Math.round((effectiveEndDate.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24));
+                    numDays = Math.min(Math.max(daysDiff, 1), 31); // Min 1, Max 31 days
+                }
+
+                // Group by actual date
+                const salesByDate: Record<string, number> = {};
                 let total = 0;
 
                 (ordersData || []).forEach(order => {
                     const orderDate = new Date(order.created_at);
-                    const daysAgo = Math.floor((Date.now() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
-                    const dayNum = 30 - daysAgo;
-                    if (dayNum > 0 && dayNum <= 30) {
-                        salesByDay[dayNum] = (salesByDay[dayNum] || 0) + order.total;
-                        total += order.total;
-                    }
+                    const dateKey = orderDate.toISOString().split('T')[0];
+                    salesByDate[dateKey] = (salesByDate[dateKey] || 0) + order.total;
+                    total += order.total;
                 });
 
-                // Create array for chart
+                // Create array for chart with actual dates
                 const chartData: DailySale[] = [];
-                for (let i = 1; i <= 30; i++) {
-                    chartData.push({ day: i, sales: salesByDay[i] || 0 });
+                for (let i = 0; i < numDays; i++) {
+                    const date = new Date(effectiveStartDate);
+                    date.setDate(effectiveStartDate.getDate() + i);
+                    const dateKey = date.toISOString().split('T')[0];
+                    const dayLabel = date.getDate();
+                    chartData.push({ day: dayLabel, sales: salesByDate[dateKey] || 0 });
                 }
 
                 setDailySales(chartData);
@@ -86,7 +109,7 @@ export default function SalesAnalysisPage() {
         }
 
         fetchSalesData();
-    }, [getDateRange]);
+    }, [getDateRange, filterPeriod]);
 
     if (isLoading) {
         return (
@@ -96,7 +119,7 @@ export default function SalesAnalysisPage() {
         );
     }
 
-    const avgDailySales = dailySales.length > 0 ? Math.round(totalRevenue / 30) : 0;
+    const avgDailySales = dailySales.length > 0 ? Math.round(totalRevenue / dailySales.length) : 0;
 
     return (
         <div className="space-y-8">
@@ -138,7 +161,7 @@ export default function SalesAnalysisPage() {
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
                 <div className="flex items-center gap-2 mb-6">
                     <TrendingUp className="h-5 w-5 text-[#7CFF9B]" />
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider">Penjualan Harian (30 Hari Terakhir)</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider">Penjualan Harian ({dailySales.length} Hari)</h3>
                 </div>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">

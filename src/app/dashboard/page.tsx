@@ -104,10 +104,16 @@ export default function DashboardPage() {
             const { data: monthlyOrders } = await revenueQuery;
             const monthlyRevenue = monthlyOrders?.reduce((sum, o) => sum + o.total, 0) || 0;
 
-            // Get total orders count
-            const { count: totalOrders } = await supabase
+            // Get total orders count within date range
+            let ordersQuery = supabase
                 .from('orders')
                 .select('*', { count: 'exact', head: true });
+
+            if (startDate && endDate) {
+                ordersQuery = ordersQuery.gte('created_at', startDate).lte('created_at', endDate);
+            }
+
+            const { count: totalOrders } = await ordersQuery;
 
             // Get active products count
             const { count: activeProducts } = await supabase
@@ -144,17 +150,26 @@ export default function DashboardPage() {
                 avgRating
             });
 
-            // Get top selling products by joining with SELESAI orders
-            const { data: orderItemsData } = await supabase
+            // Get top selling products by joining with SELESAI orders within date range
+            let orderItemsQuery = supabase
                 .from('order_items')
                 .select(`
                     product_id, 
                     product_name, 
                     quantity, 
                     total_price,
-                    orders!inner(status)
+                    orders!inner(status, created_at)
                 `)
                 .eq('orders.status', 'SELESAI');
+
+            // Apply date filter to order_items via orders
+            if (startDate && endDate) {
+                orderItemsQuery = orderItemsQuery
+                    .gte('orders.created_at', startDate)
+                    .lte('orders.created_at', endDate);
+            }
+
+            const { data: orderItemsData } = await orderItemsQuery;
 
             // Get product aggregates (average rating)
             const { data: productsData } = await supabase
@@ -201,12 +216,33 @@ export default function DashboardPage() {
             }));
             setTopRatedProducts(topRatedFormatted);
 
-            // Get monthly revenue for the last 6 months
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            // Get monthly revenue - respects filter period
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
             const monthlyRevData: MonthlyData[] = [];
-            for (let i = 5; i >= 0; i--) {
-                const date = new Date();
-                date.setMonth(date.getMonth() - i);
+
+            // Determine which months to show based on filter
+            let targetMonth = new Date().getMonth();
+            let targetYear = new Date().getFullYear();
+
+            if (filterPeriod === 'specific_month') {
+                targetMonth = selectedMonth;
+                targetYear = selectedYear;
+            } else if (filterPeriod === 'specific_date') {
+                targetMonth = new Date(selectedDate).getMonth();
+                targetYear = new Date(selectedDate).getFullYear();
+            } else if (filterPeriod === 'daily' || filterPeriod === 'weekly' || filterPeriod === 'monthly') {
+                // For daily/weekly/monthly, center on current month
+                targetMonth = new Date().getMonth();
+                targetYear = new Date().getFullYear();
+            } else if (filterPeriod === 'yearly') {
+                // For yearly, show all 12 months of current year
+                targetMonth = 5; // Center on June to show Jan-Dec
+                targetYear = new Date().getFullYear();
+            }
+
+            // Show 6 months centered around the target
+            for (let offset = -2; offset <= 3; offset++) {
+                const date = new Date(targetYear, targetMonth + offset, 1);
                 const monthStart = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
                 const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
