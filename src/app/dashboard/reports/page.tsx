@@ -24,6 +24,13 @@ interface CategoryData {
     revenue: number;
 }
 
+const formatCurrency = (value: number) => {
+    if (value >= 1_000_000_000) {
+        return `Rp ${(value / 1_000_000_000).toFixed(1).replace('.', ',')} M`;
+    }
+    return `Rp ${value.toLocaleString('id-ID')}`;
+};
+
 export default function ReportsPage() {
     const [stats, setStats] = useState<ReportStats>({
         monthlyRevenue: 0,
@@ -159,7 +166,7 @@ export default function ReportsPage() {
 
         csv += 'SUMMARY\n';
         csv += 'Metric,Value\n';
-        csv += `Monthly Revenue,Rp ${stats.monthlyRevenue.toLocaleString()}\n`;
+        csv += `Monthly Revenue,${formatCurrency(stats.monthlyRevenue)}\n`;
         csv += `Total Orders,${stats.totalOrders}\n`;
         csv += `Active Products,${stats.activeProducts}\n`;
         csv += `Total Favorites,${stats.totalFavorites}\n\n`;
@@ -167,7 +174,7 @@ export default function ReportsPage() {
         csv += 'TOP PRODUCTS\n';
         csv += 'Rank,Product,Units Sold,Revenue\n';
         topProducts.forEach((p, i) => {
-            csv += `${i + 1},${p.name},${p.sales},Rp ${p.revenue.toLocaleString()}\n`;
+            csv += `${i + 1},${p.name},${p.sales},${formatCurrency(p.revenue)}\n`;
         });
         csv += '\n';
 
@@ -246,7 +253,7 @@ export default function ReportsPage() {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center py-3 border-b border-[#1A4D35] print:border-gray-300">
                             <span className="text-[#C7D4CE] print:text-gray-600">Total Pendapatan</span>
-                            <span className="font-numeric text-[#7CFF9B] font-bold print:text-green-600">Rp {stats.monthlyRevenue.toLocaleString()}</span>
+                            <span className="font-numeric text-[#7CFF9B] font-bold print:text-green-600">{formatCurrency(stats.monthlyRevenue)}</span>
                         </div>
                         <div className="flex justify-between items-center py-3 border-b border-[#1A4D35] print:border-gray-300">
                             <span className="text-[#C7D4CE] print:text-gray-600">Total Pesanan</span>
@@ -319,7 +326,7 @@ export default function ReportsPage() {
                                         <td className="py-4 px-4 font-numeric text-[#7CFF9B] font-bold print:text-green-600">{i + 1}</td>
                                         <td className="py-4 px-4 text-white font-medium print:text-black">{product.name}</td>
                                         <td className="py-4 px-4 font-numeric text-white print:text-black">{product.sales}</td>
-                                        <td className="py-4 px-4 font-numeric text-[#1ED760] font-bold print:text-green-600">Rp {product.revenue.toLocaleString()}</td>
+                                        <td className="py-4 px-4 font-numeric text-[#1ED760] font-bold print:text-green-600">{formatCurrency(product.revenue)}</td>
                                     </tr>
                                 ))
                             )}

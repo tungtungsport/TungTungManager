@@ -39,8 +39,7 @@ export function DateFilter({
                     onChange={(e) => setFilterPeriod(e.target.value as FilterPeriod)}
                     className="bg-[#0A1A13] border border-[#1A4D35] text-white text-sm px-3 py-2 rounded focus:border-[#7CFF9B] outline-none"
                 >
-                    {showAllOption && <option value="all">Semua Waktu</option>}
-                    <option value="daily">Hari Ini</option>
+                    {/* Removed Hari Ini & Semua Waktu */}
                     <option value="weekly">Minggu Ini</option>
                     <option value="monthly">Bulan Ini</option>
                     <option value="yearly">Tahun Ini</option>
@@ -106,21 +105,24 @@ export function useDateFilter(defaultPeriod: FilterPeriod = 'all') {
                 endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
                 break;
             case 'weekly':
-                const dayOfWeek = now.getDay();
                 startDate = new Date(now);
-                startDate.setDate(now.getDate() - dayOfWeek);
+                startDate.setDate(now.getDate() - 6);
                 startDate.setHours(0, 0, 0, 0);
-                endDate = new Date(startDate);
-                endDate.setDate(startDate.getDate() + 6);
+                endDate = new Date(now);
                 endDate.setHours(23, 59, 59, 999);
                 break;
             case 'monthly':
-                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 29);
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date(now);
+                endDate.setHours(23, 59, 59, 999);
                 break;
             case 'yearly':
-                startDate = new Date(now.getFullYear(), 0, 1);
-                endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+                // Current month to 11 months back
+                startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
                 break;
             case 'specific_month':
                 startDate = new Date(selectedYear, selectedMonth, 1);

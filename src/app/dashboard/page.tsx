@@ -6,6 +6,13 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { useState, useEffect } from "react";
 import { DateFilter, useDateFilter } from "@/components/DateFilter";
 
+const formatCurrency = (value: number) => {
+    if (value >= 1_000_000_000) {
+        return `Rp ${(value / 1_000_000_000).toFixed(1).replace('.', ',')} M`;
+    }
+    return `Rp ${value.toLocaleString('id-ID')}`;
+};
+
 interface KPIStats {
     monthlyRevenue: number;
     totalOrders: number;
@@ -122,19 +129,32 @@ export default function DashboardPage() {
                 .eq('status', 'active');
 
             // Get total favorites count
-            const { count: totalFavorites } = await supabase
+            let favQuery = supabase
                 .from('favorites')
                 .select('*', { count: 'exact', head: true });
 
-            // Get average rating
-            const { data: ratingStats } = await supabase
+            if (startDate && endDate) {
+                favQuery = favQuery.gte('created_at', startDate).lte('created_at', endDate);
+            }
+            const { count: totalFavorites } = await favQuery;
+
+            // Get ratings for the period
+            let ratingsQuery = supabase
                 .from('ratings')
-                .select('rating');
+                .select('rating, product_id, products(name)');
+
+            if (startDate && endDate) {
+                ratingsQuery = ratingsQuery.gte('created_at', startDate).lte('created_at', endDate);
+            }
+
+            const { data: ratingStats } = await ratingsQuery;
+
+            // Calculate average rating
             const avgRating = ratingStats?.length
                 ? ratingStats.reduce((sum, r) => sum + r.rating, 0) / ratingStats.length
                 : 0;
 
-            // Get rating distribution
+            // Calculate rating distribution
             const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
             ratingStats?.forEach(r => {
                 dist[r.rating] = (dist[r.rating] || 0) + 1;
@@ -201,62 +221,119 @@ export default function DashboardPage() {
                 .slice(0, 5);
             setTopProducts(topProductsArr);
 
-            // Get Truly Highly Rated Products (by rating average from db)
-            const { data: ratedProductsFull } = await supabase
-                .from('products')
-                .select('id, name, rating_average, rating_count')
-                .gt('rating_count', 0)
-                .order('rating_average', { ascending: false })
-                .limit(4);
+            // Top Rated Products (Calculated from filtered ratings)
+            const ratedMap: Record<string, { name: string; totalRating: number; count: number; sales: number }> = {};
 
-            const topRatedFormatted = (ratedProductsFull || []).map(p => ({
-                name: p.name,
-                ratingAverage: p.rating_average || 0,
-                sales: salesMap[p.id]?.sales || 0
-            }));
+            (ratingStats || []).forEach((r: any) => {
+                const pId = r.product_id;
+                const pName = r.products?.name || 'Unknown';
+
+                if (!ratedMap[pId]) {
+                    ratedMap[pId] = { name: pName, totalRating: 0, count: 0, sales: salesMap[pId]?.sales || 0 };
+                }
+                ratedMap[pId].totalRating += r.rating;
+                ratedMap[pId].count += 1;
+            });
+
+            const topRatedFormatted = Object.values(ratedMap)
+                .map(item => ({
+                    name: item.name,
+                    ratingAverage: item.count > 0 ? item.totalRating / item.count : 0,
+                    sales: item.sales
+                }))
+                .sort((a, b) => b.ratingAverage - a.ratingAverage)
+                .slice(0, 4);
+
             setTopRatedProducts(topRatedFormatted);
 
-            // Get monthly revenue - respects filter period
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-            const monthlyRevData: MonthlyData[] = [];
+            // Chart Data Generation (Daily vs Monthly)
+            const chartDataArray: MonthlyData[] = [];
 
-            // Determine which months to show based on filter
-            let targetMonth = new Date().getMonth();
-            let targetYear = new Date().getFullYear();
+            // Determine if we should show Daily or Monthly view
+            // Use Monthly view for 'yearly' or very long ranges
+            const isMonthlyView = filterPeriod === 'yearly' || filterPeriod === 'all';
 
-            if (filterPeriod === 'specific_month') {
-                targetMonth = selectedMonth;
-                targetYear = selectedYear;
-            } else if (filterPeriod === 'specific_date') {
-                targetMonth = new Date(selectedDate).getMonth();
-                targetYear = new Date(selectedDate).getFullYear();
-            } else if (filterPeriod === 'daily' || filterPeriod === 'weekly' || filterPeriod === 'monthly') {
-                // For daily/weekly/monthly, center on current month
-                targetMonth = new Date().getMonth();
-                targetYear = new Date().getFullYear();
-            } else if (filterPeriod === 'yearly') {
-                // For yearly, show all 12 months of current year
-                targetMonth = 5; // Center on June to show Jan-Dec
-                targetYear = new Date().getFullYear();
-            }
+            if (isMonthlyView) {
+                // Monthly View Logic (Last 12 months or similar)
+                // For 'yearly', we want the last 12 months as per the new filter logic
+                const end = endDate ? new Date(endDate) : new Date();
+                const start = startDate ? new Date(startDate) : new Date(end.getFullYear(), end.getMonth() - 11, 1);
 
-            // Show 6 months centered around the target
-            for (let offset = -2; offset <= 3; offset++) {
-                const date = new Date(targetYear, targetMonth + offset, 1);
-                const monthStart = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
-                const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59).toISOString();
-
-                const { data: monthOrders } = await supabase
+                // Fetch monthly aggregates
+                // We'll reuse the logic to group by month
+                const monthOrdersQuery = supabase
                     .from('orders')
-                    .select('total')
-                    .gte('created_at', monthStart)
-                    .lte('created_at', monthEnd)
-                    .eq('status', 'SELESAI');
+                    .select('total, created_at')
+                    .eq('status', 'SELESAI')
+                    .gte('created_at', start.toISOString())
+                    .lte('created_at', end.toISOString());
 
-                const revenue = monthOrders?.reduce((sum, o) => sum + o.total, 0) || 0;
-                monthlyRevData.push({ month: months[date.getMonth()], revenue });
+                const { data: mOrders } = await monthOrdersQuery;
+
+                const mRevMap: Record<string, number> = {};
+                (mOrders || []).forEach(o => {
+                    const d = new Date(o.created_at);
+                    // Key: YYYY-MM
+                    const key = `${d.getFullYear()}-${d.getMonth()}`;
+                    mRevMap[key] = (mRevMap[key] || 0) + o.total;
+                });
+
+                // Generate labels
+                // Basic loop for 12 months or range duration
+                // If yearly, exactly 12 months
+                const monthsCount = 12; // Fixed for yearly
+                for (let i = 0; i < monthsCount; i++) {
+                    const d = new Date(start);
+                    d.setMonth(start.getMonth() + i);
+                    const key = `${d.getFullYear()}-${d.getMonth()}`;
+                    const label = d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+                    chartDataArray.push({ month: label, revenue: mRevMap[key] || 0 });
+                }
+            } else {
+                // Daily View Logic (default for day/week/month)
+                // Use startDate/endDate from filter
+                // If specific_date, it's just 1 day
+
+                let start = startDate ? new Date(startDate) : new Date();
+                let end = endDate ? new Date(endDate) : new Date();
+
+                // Safety: if no range (shouldn't happen with updated DateFilter), default to last 7 days
+                if (!startDate) {
+                    end = new Date();
+                    start = new Date();
+                    start.setDate(end.getDate() - 6);
+                }
+
+                const dayOrdersQuery = supabase
+                    .from('orders')
+                    .select('total, created_at')
+                    .eq('status', 'SELESAI')
+                    .gte('created_at', start.toISOString())
+                    .lte('created_at', end.toISOString());
+
+                const { data: dOrders } = await dayOrdersQuery;
+
+                const dRevMap: Record<string, number> = {};
+                (dOrders || []).forEach(o => {
+                    const dateKey = new Date(o.created_at).toISOString().split('T')[0];
+                    dRevMap[dateKey] = (dRevMap[dateKey] || 0) + o.total;
+                });
+
+                // Iterate days
+                const dayDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+                // Cap at 31 days for safety if something is wrong, but 'monthly' is ~30
+                const numDays = Math.max(1, Math.min(dayDiff, 32));
+
+                for (let i = 0; i < numDays; i++) {
+                    const d = new Date(start);
+                    d.setDate(start.getDate() + i);
+                    const key = d.toISOString().split('T')[0];
+                    const label = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                    chartDataArray.push({ month: label, revenue: dRevMap[key] || 0 });
+                }
             }
-            setMonthlyData(monthlyRevData);
+
+            setMonthlyData(chartDataArray);
 
             setIsLoading(false);
         }
@@ -296,7 +373,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <KPICard
                     title="Pendapatan Bulanan"
-                    value={`Rp ${(stats.monthlyRevenue / 1000000).toFixed(1)}M`}
+                    value={formatCurrency(stats.monthlyRevenue)}
                     icon={DollarSign}
                     color="accent"
                 />
@@ -322,9 +399,11 @@ export default function DashboardPage() {
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Monthly Sales Trend */}
+                {/* Sales Trend Chart */}
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">Tren Penjualan Bulanan</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider mb-6">
+                        {filterPeriod === 'yearly' ? 'Tren Penjualan Bulanan' : 'Tren Penjualan Harian'}
+                    </h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={monthlyData}>
@@ -333,11 +412,11 @@ export default function DashboardPage() {
                                 <YAxis
                                     stroke="#C7D4CE"
                                     fontSize={12}
-                                    tickFormatter={(value) => `${(value / 1000000)}M`}
+                                    tickFormatter={(value) => formatCurrency(value)}
                                 />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0F2A1E', border: '1px solid #1A4D35', color: '#fff' }}
-                                    formatter={(value: number | undefined) => [value ? `Rp ${(value / 1000000).toFixed(1)}M` : 'Rp 0M', 'Revenue']}
+                                    formatter={(value: number | undefined) => [value ? formatCurrency(value) : formatCurrency(0), 'Revenue']}
                                 />
                                 <Line
                                     type="monotone"
@@ -393,7 +472,7 @@ export default function DashboardPage() {
                             <BarChart data={ratingDistribution}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1A4D35" vertical={false} />
                                 <XAxis dataKey="stars" stroke="#C7D4CE" fontSize={12} tickFormatter={(val) => `${val} ★`} />
-                                <YAxis stroke="#C7D4CE" fontSize={12} />
+                                <YAxis stroke="#C7D4CE" fontSize={12} allowDecimals={false} />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0F2A1E', border: '1px solid #1A4D35', color: '#fff' }}
                                     cursor={{ fill: 'rgba(124, 255, 155, 0.05)' }}
@@ -458,7 +537,7 @@ export default function DashboardPage() {
                                     <tr key={i} className="border-b border-[#1A4D35] last:border-0">
                                         <td className="py-4 px-4 text-white font-medium">{product.name}</td>
                                         <td className="py-4 px-4 font-numeric text-[#7CFF9B] font-bold">{product.sales}</td>
-                                        <td className="py-4 px-4 font-numeric text-white">Rp {(product.revenue / 1000000).toFixed(1)}M</td>
+                                        <td className="py-4 px-4 font-numeric text-white">{formatCurrency(product.revenue)}</td>
                                     </tr>
                                 ))
                             )}

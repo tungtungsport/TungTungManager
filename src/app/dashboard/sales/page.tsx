@@ -7,9 +7,16 @@ import { useState, useEffect } from "react";
 import { DateFilter, useDateFilter } from "@/components/DateFilter";
 
 interface DailySale {
-    day: number;
+    day: string;
     sales: number;
 }
+
+const formatCurrency = (value: number) => {
+    if (value >= 1_000_000_000) {
+        return `Rp ${(value / 1_000_000_000).toFixed(1).replace('.', ',')} M`;
+    }
+    return `Rp ${value.toLocaleString('id-ID')}`;
+};
 
 export default function SalesAnalysisPage() {
     const [dailySales, setDailySales] = useState<DailySale[]>([]);
@@ -24,7 +31,7 @@ export default function SalesAnalysisPage() {
         selectedYear, setSelectedYear,
         selectedDate, setSelectedDate,
         getDateRange
-    } = useDateFilter('daily');
+    } = useDateFilter('weekly');
 
     useEffect(() => {
         async function fetchSalesData() {
@@ -61,41 +68,71 @@ export default function SalesAnalysisPage() {
                     return;
                 }
 
-                // Calculate number of days in the range
-                // For weekly: should be exactly 7 days (Sun-Sat)
-                // For monthly: special case - show 30 days back from end date
-                let numDays: number;
+                // Helper to get local date key (YYYY-MM-DD) safely
+                const getLocalISO = (date: Date) => {
+                    const offset = date.getTimezoneOffset();
+                    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+                    return localDate.toISOString().split('T')[0];
+                };
 
-                if (filterPeriod === 'monthly') {
-                    // For "Bulan Ini", show last 30 days from today
-                    numDays = 30;
-                    effectiveStartDate = new Date(effectiveEndDate);
-                    effectiveStartDate.setDate(effectiveEndDate.getDate() - 29); // 30 days including today
-                } else {
-                    // Calculate days between dates (inclusive of start, exclusive of end + 1 day)
-                    const daysDiff = Math.round((effectiveEndDate.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24));
-                    numDays = Math.min(Math.max(daysDiff, 1), 31); // Min 1, Max 31 days
-                }
-
-                // Group by actual date
-                const salesByDate: Record<string, number> = {};
+                // Group Data Logic
+                const chartData: DailySale[] = [];
                 let total = 0;
 
-                (ordersData || []).forEach(order => {
-                    const orderDate = new Date(order.created_at);
-                    const dateKey = orderDate.toISOString().split('T')[0];
-                    salesByDate[dateKey] = (salesByDate[dateKey] || 0) + order.total;
-                    total += order.total;
-                });
+                if (filterPeriod === 'yearly') {
+                    // Group by Month for Yearly view (Last 12 months)
+                    const salesByMonth: Record<string, number> = {};
+                    (ordersData || []).forEach(order => {
+                        const d = new Date(order.created_at);
+                        const key = getLocalISO(d).slice(0, 7); // YYYY-MM
+                        salesByMonth[key] = (salesByMonth[key] || 0) + order.total;
+                        total += order.total;
+                    });
 
-                // Create array for chart with actual dates
-                const chartData: DailySale[] = [];
-                for (let i = 0; i < numDays; i++) {
-                    const date = new Date(effectiveStartDate);
-                    date.setDate(effectiveStartDate.getDate() + i);
-                    const dateKey = date.toISOString().split('T')[0];
-                    const dayLabel = date.getDate();
-                    chartData.push({ day: dayLabel, sales: salesByDate[dateKey] || 0 });
+                    // Generate last 12 months
+                    for (let i = 0; i < 12; i++) {
+                        const d = new Date(effectiveStartDate);
+                        d.setMonth(d.getMonth() + i);
+                        const key = getLocalISO(d).slice(0, 7); // YYYY-MM
+
+                        // Format: "Jan 2025"
+                        const label = d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+                        chartData.push({ day: label, sales: salesByMonth[key] || 0 });
+                    }
+                } else {
+                    // Daily Logic for other filters
+                    let numDays: number;
+
+                    if (filterPeriod === 'monthly') {
+                        // For "Bulan Ini", show last 30 days from today
+                        numDays = 30;
+                        effectiveStartDate = new Date(effectiveEndDate);
+                        effectiveStartDate.setDate(effectiveEndDate.getDate() - 29); // 30 days including today
+                    } else {
+                        // Calculate days between dates (inclusive of start, exclusive of end + 1 day)
+                        const daysDiff = Math.round((effectiveEndDate.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24));
+                        numDays = Math.min(Math.max(daysDiff, 1), 31); // Min 1, Max 31 days
+                    }
+
+                    // Group by actual date
+                    const salesByDate: Record<string, number> = {};
+
+                    (ordersData || []).forEach(order => {
+                        const orderDate = new Date(order.created_at);
+                        const dateKey = getLocalISO(orderDate); // YYYY-MM-DD
+                        salesByDate[dateKey] = (salesByDate[dateKey] || 0) + order.total;
+                        total += order.total;
+                    });
+
+                    // Create array for chart with actual dates
+                    for (let i = 0; i < numDays; i++) {
+                        // Use millisecond arithmetic for reliable date increment
+                        const dateMs = effectiveStartDate.getTime() + (i * 24 * 60 * 60 * 1000);
+                        const date = new Date(dateMs);
+                        const dateKey = getLocalISO(date); // YYYY-MM-DD
+                        const dayLabel = `${date.getDate()}/${date.getMonth() + 1}`;
+                        chartData.push({ day: dayLabel, sales: salesByDate[dateKey] || 0 });
+                    }
                 }
 
                 setDailySales(chartData);
@@ -145,11 +182,13 @@ export default function SalesAnalysisPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-5">
                     <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Total Pendapatan</p>
-                    <p className="font-numeric text-2xl text-[#7CFF9B] font-bold">Rp {(totalRevenue / 1000000).toFixed(1)}M</p>
+                    <p className="font-numeric text-2xl text-[#7CFF9B] font-bold">{formatCurrency(totalRevenue)}</p>
                 </div>
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-5">
-                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Rata-rata Harian</p>
-                    <p className="font-numeric text-2xl text-white font-bold">Rp {(avgDailySales / 1000000).toFixed(2)}M</p>
+                    <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">
+                        {filterPeriod === 'yearly' ? 'Rata-rata Bulanan' : 'Rata-rata Harian'}
+                    </p>
+                    <p className="font-numeric text-2xl text-white font-bold">{formatCurrency(avgDailySales)}</p>
                 </div>
                 <div className="bg-[#0F2A1E] border border-[#1A4D35] p-5">
                     <p className="text-[#C7D4CE] text-xs uppercase tracking-wider mb-2">Total Pesanan</p>
@@ -161,7 +200,11 @@ export default function SalesAnalysisPage() {
             <div className="bg-[#0F2A1E] border border-[#1A4D35] p-6">
                 <div className="flex items-center gap-2 mb-6">
                     <TrendingUp className="h-5 w-5 text-[#7CFF9B]" />
-                    <h3 className="font-heading text-white text-sm uppercase tracking-wider">Penjualan Harian ({dailySales.length} Hari)</h3>
+                    <h3 className="font-heading text-white text-sm uppercase tracking-wider">
+                        {filterPeriod === 'yearly'
+                            ? `Penjualan Bulanan (${dailySales.length} Bulan)`
+                            : `Penjualan Harian (${dailySales.length} Hari)`}
+                    </h3>
                 </div>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -171,15 +214,15 @@ export default function SalesAnalysisPage() {
                             <YAxis
                                 stroke="#C7D4CE"
                                 fontSize={12}
-                                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                                tickFormatter={(value) => formatCurrency(value)}
                             />
                             <Tooltip
                                 contentStyle={{ backgroundColor: '#0F2A1E', border: '1px solid #1A4D35', color: '#fff' }}
-                                formatter={(value: any) => [`Rp ${(Number(value) / 1000000).toFixed(2)}M`, 'Penjualan']}
-                                labelFormatter={(label) => `Day ${label}`}
+                                formatter={(value: any) => [formatCurrency(Number(value)), 'Penjualan']}
+                                labelFormatter={(label) => label}
                             />
                             <Line
-                                type="monotone"
+                                type="linear"
                                 dataKey="sales"
                                 stroke="#7CFF9B"
                                 strokeWidth={2}
